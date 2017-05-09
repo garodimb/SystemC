@@ -45,6 +45,7 @@ SC_MODULE(adder)
 	SC_CTOR(adder)
 	{
 		is_out = true; // Start from true, to nullify value of is_out after default initialization
+		result = 0;
 		SC_METHOD(add);
 		sensitive << a << b; // Sensitive to a, and b
 	}
