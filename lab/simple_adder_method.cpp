@@ -22,8 +22,8 @@ SC_MODULE(adder)
 	sc_in<int> b;
 	sc_out<int> out;
 	
-	sc_event do_out; // Event for writing value to out
 	int result; // Temporary to store result
+	bool is_out; // To sync whether to write or read
 
 	void add()
 	{	
@@ -31,22 +31,22 @@ SC_MODULE(adder)
 		 * Adder functionality to read value at port 'a' and 'b', and output
 		 * the result after 2 NS on 'out' port.
 		 */
+	if(!is_out){
 			result = a.read() + b.read();
-			do_out.notify(2, SC_NS);
+			next_trigger(2, SC_NS);
+			is_out = true;
+			}
+		else{
+			out.write(result);
+			is_out = false;
+			}
 	}
 	
-	void write_out()
-	{
-		out.write(a.read() + b.read()); // Can also be written as a + b		
-	}
-
 	SC_CTOR(adder)
 	{
+		is_out = true; // Start from true, to nullify value of is_out after default initialization
 		SC_METHOD(add);
 		sensitive << a << b; // Sensitive to a, and b
-
-		SC_METHOD(write_out);
-		sensitive << do_out; // Sensitive to event do_out
 	}
 };
 
