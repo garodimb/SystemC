@@ -21,7 +21,7 @@ SC_MODULE(adder)
 	sc_in<int> a;
 	sc_in<int> b;
 	sc_out<int> out;
-	
+
 	int result; // Temporary to store result
 	bool is_out; // To sync whether to write or read
 
@@ -57,6 +57,9 @@ SC_MODULE(testbench)
 	sc_out<int> b;
 	sc_in<int> out;
 
+	int input[12];
+	int indx;
+
 	void monitor()
 	{
 		/**
@@ -67,25 +70,25 @@ SC_MODULE(testbench)
 	
 	void test()
 	{
-		a.write(0);
-		b.write(0);
+		a.write(input[indx]);
+		b.write(input[indx+1]);
 
-		wait(5, SC_NS);
-		a.write(5);
-
-		wait(2, SC_NS);
-		b.write(10);
-
-		wait(8, SC_NS);
-		a.write(8);
-		b.write(7);
+		if(input[indx+2] > 0){
+			next_trigger(input[indx+2], SC_NS);
+			indx += 3;
+		}
 	}
 
 	SC_CTOR(testbench)
 	{
+		input[0] = 1, input[1] = 0, input[2] = 5;
+		input[3] = 5, input[4] = 0, input[5] = 2;
+		input[6] = 5, input[7] = 10, input[8] = 8;
+		input[9] = 10, input[10] = 11, input[11] = -1;
+		indx = 0;
 		SC_METHOD(monitor);
 		sensitive << out;
-		SC_THREAD(test);
+		SC_METHOD(test);
 	}
 
 };
