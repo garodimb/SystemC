@@ -12,9 +12,16 @@
 
  * Whenever the value changes at the output port of adder, the testbench should print the
  * value of this port and the simulation time
+
+ * Note: This program takes one testfile as input. Below is the format of testfile.
+ * 1. Each line conatins three integers.
+ * 2. First two integers are input for 'a' and 'b' port.
+ * 3. Third integer is relative time for next input in nano-sec.
+ * 4. Time less than or equal to zero means end of input
  */
 
 #include <systemc.h>
+#include <fstream>
 
 SC_MODULE(adder)
 {
@@ -57,8 +64,7 @@ SC_MODULE(testbench)
 	sc_out<int> b;
 	sc_in<int> out;
 
-	int input[12];
-	int indx;
+	ifstream test_stream;
 
 	void monitor()
 	{
@@ -70,22 +76,28 @@ SC_MODULE(testbench)
 	
 	void test()
 	{
-		a.write(input[indx]);
-		b.write(input[indx+1]);
-
-		if(input[indx+2] > 0){
-			next_trigger(input[indx+2], SC_NS);
-			indx += 3;
+		/*
+		 * Read test input from given file and applies to port
+		 */
+		int a_in , b_in, next_t;
+		test_stream >> a_in >> b_in >> next_t;
+		a.write(a_in);
+		b.write(b_in);
+		if(next_t > 0){
+			next_trigger(next_t, SC_NS);
 		}
 	}
 
-	SC_CTOR(testbench)
+	SC_HAS_PROCESS(testbench);
+	testbench(sc_module_name name, char *testfile)
+	: sc_module(name)
 	{
-		input[0] = 1, input[1] = 0, input[2] = 5;
-		input[3] = 5, input[4] = 0, input[5] = 2;
-		input[6] = 5, input[7] = 10, input[8] = 8;
-		input[9] = 10, input[10] = 11, input[11] = -1;
-		indx = 0;
+		test_stream.open(testfile);
+		if(!test_stream.is_open()){
+			cout << "[ERROR] Unable to open testfile " << testfile << "!" << endl;
+			exit(1);
+		}
+
 		SC_METHOD(monitor);
 		sensitive << out;
 		SC_METHOD(test);
@@ -96,14 +108,20 @@ SC_MODULE(testbench)
 
 int sc_main(int argc, char *argv[])
 {
+
 	// Signals to connect to adder module
 	sc_signal<int> a;
 	sc_signal<int> b;
 	sc_signal<int> out;
 
+	if(argc != 2){
+		cout << "[ERROR] Required 1 argument, provided " << argc - 1 << "!" << endl;
+		cout << "Usage: " << argv[0] << " testfile" << endl;
+		return 1;
+	}
 	// Instance of 'adder' module
 	adder adder_obj("Adder");
-	testbench tb("tb");
+	testbench tb("tb",argv[1]);
 
 	// Bind signals to ports by name
 	adder_obj.a(a);
