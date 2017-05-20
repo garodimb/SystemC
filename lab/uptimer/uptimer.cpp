@@ -2,8 +2,8 @@
 #define MAX_VALUE 255
 
 #define TIMER_CNTRL 		0x0
-#define TIMER_VAL 			0x4
-#define TIMER_CMP 			0x8
+#define TIMER_VAL 		0x4
+#define TIMER_CMP 		0x8
 #define	TIMER_INTR_STATUS 	0xC
 
 // Timer control register bits
@@ -80,16 +80,16 @@ SC_MODULE(uptimer)
 		if(read_en.read()){
 			switch(addr.read()){
 				case TIMER_CNTRL:
-								data_out.write(timer_cntrl);
-								break;
+						data_out.write(timer_cntrl);
+						break;
 
 				case TIMER_VAL:
-								data_out.write(timer_val);
-								break;
+						data_out.write(timer_val);
+						break;
 
 				case TIMER_CMP:
-								data_out.write(timer_cmp);
-								break;
+						data_out.write(timer_cmp);
+						break;
 			}
 		}
 			
@@ -103,23 +103,23 @@ SC_MODULE(uptimer)
 		if(write_en.read()){
 			switch(addr.read()){
 				case TIMER_CNTRL:
-								timer_cntrl.range(7, 0) = data_in.read();
-								break;
+						timer_cntrl.range(7, 0) = data_in.read();
+						break;
 
 				case TIMER_CMP:
-								timer_cmp = data_in.read();
-								break;
+						timer_cmp = data_in.read();
+						break;
 				
 				// Reset interrupts by write 1 clear register
 				case TIMER_INTR_STATUS:
-								if(CHECK_BIT(TIMER_INTR_STATUS_OV, data_in.read())){
-									timer_intr_status[TIMER_CNTRL_OV] = 0;
-									int0.write(0);
-								}
-								if(CHECK_BIT(TIMER_INTR_STATUS_CMP, data_in.read())){
-									timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
-									int1.write(0);
-								}
+							if(CHECK_BIT(TIMER_INTR_STATUS_OV, data_in.read())){
+								timer_intr_status[TIMER_CNTRL_OV] = 0;
+								int0.write(0);
+							}
+							if(CHECK_BIT(TIMER_INTR_STATUS_CMP, data_in.read())){
+								timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
+								int1.write(0);
+							}
 			}
 		}
 			
