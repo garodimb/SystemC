@@ -148,7 +148,7 @@ SC_MODULE(uptimer)
 		// Increment sensitive to timer clock
 		SC_METHOD(incr);
 		sensitive << clock.pos();
-
+		dont_initialize();
 		// Read sensitive to read_en or addr
 		SC_METHOD(read);
 		sensitive << read_en << addr;
