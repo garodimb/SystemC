@@ -1,6 +1,7 @@
 #include <systemc.h>
-#define MAX_VALUE 255
 
+#define MAX_VALUE 256
+#define ASSERT_TIME 10
 #define TIMER_CNTRL 		0x0
 #define TIMER_VAL 			0x4
 #define TIMER_CMP 			0x8
@@ -19,13 +20,183 @@
 SC_MODULE(uptimer)
 {
 	private:
+		unsigned int clk_period;
+		unsigned int total_stop_time; // Total time when timer was not running
+		unsigned int last_stop_time; // Last time stamp in ns when it stopped
+
 		sc_bv<8> timer_cntrl; // Timer control register
-		sc_uint<8> timer_val; // Timer value register
 		sc_uint<8> timer_cmp; // Timer compare register
 		sc_bv<8> timer_intr_status; // Timer interrupt status register
+		
+		sc_event set_overflow;
+		sc_event reset_overflow;
+		sc_event set_match;
+		sc_event reset_match;
+
+		sc_uint<8> get_timer_val()
+		{
+			unsigned int total_time;
+			if(timer_cntrl[TIMER_CNTRL_EN]){
+				total_time = sc_time_stamp().value() - total_stop_time;
+				return (total_time/clk_period + 1) % MAX_VALUE;
+			}
+			else{
+				total_time = last_stop_time - total_stop_time;
+				return (total_time/clk_period + 1) % MAX_VALUE;
+			}
+		}
+
+		void set_overflow_clbk()
+		{
+			/**
+			 * Callback function will be get called on each overflow. Set next overflow event
+			 * If overfull interuppt is enable then assert it
+			 */ 
+			if(timer_cntrl[TIMER_CNTRL_OV]){
+					int0.write(1);
+					timer_intr_status[TIMER_INTR_STATUS_OV] = 1;
+			}
+			reset_overflow.notify(ASSERT_TIME, SC_NS);
+			set_overflow.notify( MAX_VALUE * clk_period, SC_NS); // Set next overflow
+
+		}
+
+		void reset_overflow_clbk()
+		{
+			int0.write(0);
+			timer_intr_status[TIMER_INTR_STATUS_OV] = 0;
+		}
+	
+		void set_match_clbk()
+		{
+			if(timer_cntrl[TIMER_CNTRL_CMP]){
+				int1.write(1);
+				timer_intr_status[TIMER_INTR_STATUS_CMP] = 1;
+			}
+			reset_match.notify(ASSERT_TIME, SC_NS);
+			set_match.notify( MAX_VALUE * clk_period, SC_NS); // Match will occur after full cycle.
+		}
+
+		void reset_match_clbk()
+		{
+			int1.write(0);
+			timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
+		}
+
+		void read()
+		{
+			/**
+			 * Read TIMER_CNTRL, TIMER_VAL and TIMER_CMP registers
+			 */
+			if(read_en.read()){
+				switch(addr.read()){
+					case TIMER_CNTRL:
+									data_out.write(timer_cntrl);
+									break;
+
+					case TIMER_VAL:
+									data_out.write(get_timer_val());
+									break;
+
+					case TIMER_CMP:
+									data_out.write(timer_cmp);
+									break;
+				}
+			}
+				
+		}
+
+		void write_timer_cntrl(sc_uint<8> data)
+		{
+			timer_cntrl = data;
+			sc_uint<8> timer_val;
+			if(!data[TIMER_CNTRL_EN]){
+				// Last time counter is disabled, lowest multiple of clock period in ns.
+				last_stop_time = ((sc_time_stamp().value() - 1)/clk_period) * clk_period; 
+				set_overflow.cancel();
+				set_match.cancel();
+			}
+			else{
+				// Counter will be incremented in this cycle by 1 so - clk_period
+				if(sc_time_stamp().value() < (last_stop_time + clk_period)){
+					total_stop_time = 0;
+				}
+				else{
+					total_stop_time += sc_time_stamp().value() - (last_stop_time + clk_period);
+				}
+
+				timer_val = get_timer_val();
+				set_overflow.notify((MAX_VALUE - timer_val) * clk_period, SC_NS);
+
+				if(timer_val <= timer_cmp){
+					// In this cycle only
+					set_match.notify((timer_cmp - timer_val) * clk_period, SC_NS);
+				}
+				else{
+					// After complete cycle
+					set_match.notify((MAX_VALUE - timer_val + timer_cmp) * clk_period, SC_NS);
+				}	
+			}
+		}
+
+		void write_timer_cmp(sc_uint<8> data)
+		{
+			timer_cmp = data;
+			set_match.cancel();
+			sc_uint<8> timer_val = get_timer_val();
+			if(timer_val <= timer_cmp){
+				// In this cycle only
+				set_match.notify((timer_cmp - timer_val) * clk_period, SC_NS);
+			}
+			else{
+				// After complete cycle
+				set_match.notify((MAX_VALUE - timer_val + timer_cmp) * clk_period, SC_NS);
+			}
+		}
+
+		void write()
+		{
+			/**
+			 * Write to TIMER_CNTRL, TIMER_CMP and TIMER_INTR_STATUS
+			 */
+			if(write_en.read()){
+				switch(addr.read()){
+					case TIMER_CNTRL:
+									write_timer_cntrl(data_in.read());
+									break;
+
+					case TIMER_CMP:
+									write_timer_cmp(data_in.read());
+									break;
+					
+					// Reset interrupts by write 1 clear register
+					case TIMER_INTR_STATUS:
+									if(CHECK_BIT(TIMER_INTR_STATUS_OV, data_in.read())){
+										timer_intr_status[TIMER_INTR_STATUS_OV] = 0;
+										int0.write(0);
+									}
+									if(CHECK_BIT(TIMER_INTR_STATUS_CMP, data_in.read())){
+										timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
+										int1.write(0);
+									}
+				}
+			}
+				
+		}
+		
+		void reset_mod()
+		{
+			// Reset module
+			timer_cntrl = 0;
+			timer_cmp = 0;
+			timer_intr_status = 0;
+			int0 = 0;
+			int1 = 0;
+			set_match.cancel();
+			set_overflow.cancel();
+		}
 
 	public:
-		sc_in<bool> clock; // Clock
 		sc_in<bool> reset; // Reset
 		sc_in< sc_uint<8> > addr; // In Address
 		sc_in< sc_uint<8> > data_in; // In Data
@@ -37,129 +208,51 @@ SC_MODULE(uptimer)
 		sc_in<bool> read_en; // Read enable
 		sc_in<bool> write_en; // Write enable
 
-	void incr()
-	{
-		/**
-		 * Increment timer if timer is enable and set corresponding
-		 * interrupts on overflow and match
-		 */
-		if(!timer_cntrl[TIMER_CNTRL_EN])
-			return;
-
-		// Timer value is MAX_VALUE, set overflow interrupt
-		if(timer_val==MAX_VALUE){
-			timer_val = 0;
-			if(timer_cntrl[TIMER_CNTRL_OV]){
-				int0.write(1);
-				timer_intr_status[TIMER_CNTRL_OV] = 1;
-			}
-		}
-		else{
-			timer_val = timer_val + 1;
-			int0.write(0);
-			timer_intr_status[TIMER_CNTRL_OV] = 0;
-		}
-
-		// Timer value matches to compare value, set comparator interrupt
-		if(timer_cntrl[TIMER_CNTRL_CMP] && timer_val==timer_cmp){
-			int1.write(1);
-			timer_intr_status[TIMER_CNTRL_CMP] = 1;
-		}
-		else{
-			int1.write(0);
-			timer_intr_status[TIMER_CNTRL_CMP] = 0;
-		}
-
-	}
-
-	void read()
-	{
-		/**
-		 * Read TIMER_CNTRL, TIMER_VAL and TIMER_CMP registers
-		 */
-		if(read_en.read()){
-			switch(addr.read()){
-				case TIMER_CNTRL:
-								data_out.write(timer_cntrl);
-								break;
-
-				case TIMER_VAL:
-								data_out.write(timer_val);
-								break;
-
-				case TIMER_CMP:
-								data_out.write(timer_cmp);
-								break;
-			}
-		}
-			
-	}
-
-	void write()
-	{
-		/**
-		 * Write to TIMER_CNTRL, TIMER_CMP and TIMER_INTR_STATUS
-		 */
-		if(write_en.read()){
-			switch(addr.read()){
-				case TIMER_CNTRL:
-								timer_cntrl.range(7, 0) = data_in.read();
-								break;
-
-				case TIMER_CMP:
-								timer_cmp = data_in.read();
-								break;
-				
-				// Reset interrupts by write 1 clear register
-				case TIMER_INTR_STATUS:
-								if(CHECK_BIT(TIMER_INTR_STATUS_OV, data_in.read())){
-									timer_intr_status[TIMER_CNTRL_OV] = 0;
-									int0.write(0);
-								}
-								if(CHECK_BIT(TIMER_INTR_STATUS_CMP, data_in.read())){
-									timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
-									int1.write(0);
-								}
-			}
-		}
-			
-	}
-	
-	void reset_mod()
-	{
-		// Reset module
-		if(reset.read()){
-			timer_cntrl = 0;
-			timer_val = 0;
-			timer_cmp = 0;
-			timer_intr_status = 0;
-			int0 = 0;
-			int1 = 0;
-		}
-	}
 
 	SC_CTOR(uptimer)
 	{
 		timer_cntrl = 0x07;
-		timer_val = 0x00;
-		timer_cmp = 0x00;
+		timer_cmp = 0;
 		timer_intr_status = 0x00;
 
-		// Increment sensitive to timer clock
-		SC_METHOD(incr);
-		sensitive << clock.pos();
+		clk_period = 20;
+		last_stop_time = 0;
+		total_stop_time = 0;
+
+		SC_METHOD(set_overflow_clbk);
 		dont_initialize();
+		sensitive << set_overflow;
+		// Counter becomes 1 at first clock cycle at time 0s, so adjusted by -1
+		set_overflow.notify((MAX_VALUE-1)* clk_period , SC_NS);
+
+		SC_METHOD(reset_overflow_clbk);
+		dont_initialize();
+		sensitive << reset_overflow;
+
+		SC_METHOD(set_match_clbk);
+		dont_initialize();
+		sensitive << set_match;
+		// Counter becomes 1 at first clock cycle at time 0s, so adjusted by -1
+		set_match.notify((timer_cmp-1) * clk_period, SC_NS);
+
+		SC_METHOD(reset_match_clbk);
+		dont_initialize();
+		sensitive << reset_match;
+
 		// Read sensitive to read_en or addr
 		SC_METHOD(read);
+		dont_initialize();
 		sensitive << read_en << addr;
-
+		
 		// Write sensitive to write_en, addr or data_in
 		SC_METHOD(write);
+		dont_initialize();
 		sensitive << write_en << addr << data_in;
-
+		
 		// reset_mod sensitive to reset
 		SC_METHOD(reset_mod);
-		sensitive << reset;
+		dont_initialize();
+		sensitive << reset.pos();
 	}
 
 	void end_of_elaboration()
@@ -174,7 +267,6 @@ SC_MODULE(uptimer)
 
 SC_MODULE(testbench)
 {
-	sc_in<bool> clock; // Clock
 	sc_out<bool> reset; // Reset
 	sc_out< sc_uint<8> > addr; // In Address
 	sc_out< sc_uint<8> > data_in; // In Data
@@ -322,8 +414,7 @@ SC_MODULE(testbench)
 
 int sc_main(int argc, char *argv[])
 {
-	sc_clock clock("my_clock", 20, SC_NS, 0.5);
-
+	sc_set_time_resolution(1, SC_NS);
 	uptimer timer("timer");
 	testbench tb("tb");
 
@@ -331,15 +422,14 @@ int sc_main(int argc, char *argv[])
 	sc_signal< sc_uint<8> > addr; // In Address
 	sc_signal< sc_uint<8> > data_in; // In Data
 
-	sc_signal<bool> int0;  // Overflow interrupt
-	sc_signal<bool> int1; // Copmarator interrupt
+	sc_signal<bool, SC_MANY_WRITERS> int0;  // Overflow interrupt
+	sc_signal<bool, SC_MANY_WRITERS> int1; // Copmarator interrupt
 	sc_signal< sc_uint<8> > data_out; // Data out
 
 	sc_signal<bool> read_en; // Read enable
 	sc_signal<bool> write_en; // Write enable
 
 	// Connect signals to timer instance
-	timer.clock(clock);
 	timer.reset(reset);
 	timer.addr(addr);
 	timer.data_in(data_in);
@@ -350,7 +440,6 @@ int sc_main(int argc, char *argv[])
 	timer.write_en(write_en);
 
 	// Connect signals to testbench instance
-	tb.clock(clock);
 	tb.reset(reset);
 	tb.addr(addr);
 	tb.data_in(data_in);
@@ -381,7 +470,7 @@ Interrupt asserted: Intr1 ( 18040 ns )
 [ 18471 ns ] 156
 [ 19991 ns ] 232
 [ 20 us ] Disable timer
-[ 20501 ns ] 233
+[ 20501 ns ] 232
 [ 21 us ] Enable timer
 Interrupt asserted: Intr0 ( 21460 ns )
 Interrupt asserted: Intr1 ( 24160 ns )
@@ -405,8 +494,8 @@ Interrupt asserted: Intr0 ( 1009620 ns )
 
 Info: /OSCI/SystemC: Simulation stopped by user.
 
-real	0m2.875s
-user	0m2.864s
-sys	0m0.004s
+real	0m0.028s
+user	0m0.020s
+sys	    0m0.004s
 
 **/
