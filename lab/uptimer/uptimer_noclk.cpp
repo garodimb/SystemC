@@ -209,21 +209,22 @@ SC_MODULE(uptimer)
 		sc_in<bool> write_en; // Write enable
 
 
-	SC_CTOR(uptimer)
+	uptimer(sc_module_name name, unsigned int clk_period_)
+	: sc_module(name)
 	{
-		timer_cntrl = 0x07;
-		timer_cmp = 0;
+		timer_cntrl = 0x00;
+		timer_cmp = 0x00;
 		timer_intr_status = 0x00;
 
-		clk_period = 20;
+		clk_period = clk_period_;
 		last_stop_time = 0;
 		total_stop_time = 0;
+
+		SC_HAS_PROCESS(uptimer);
 
 		SC_METHOD(set_overflow_clbk);
 		dont_initialize();
 		sensitive << set_overflow;
-		// Counter becomes 1 at first clock cycle at time 0s, so adjusted by -1
-		set_overflow.notify((MAX_VALUE-1)* clk_period , SC_NS);
 
 		SC_METHOD(reset_overflow_clbk);
 		dont_initialize();
@@ -232,8 +233,6 @@ SC_MODULE(uptimer)
 		SC_METHOD(set_match_clbk);
 		dont_initialize();
 		sensitive << set_match;
-		// Counter becomes 1 at first clock cycle at time 0s, so adjusted by -1
-		set_match.notify((timer_cmp-1) * clk_period, SC_NS);
 
 		SC_METHOD(reset_match_clbk);
 		dont_initialize();
@@ -415,7 +414,7 @@ SC_MODULE(testbench)
 int sc_main(int argc, char *argv[])
 {
 	sc_set_time_resolution(1, SC_NS);
-	uptimer timer("timer");
+	uptimer timer("timer",20);
 	testbench tb("tb");
 
 	sc_signal<bool> reset; // Reset
