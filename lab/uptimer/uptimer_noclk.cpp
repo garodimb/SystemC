@@ -1,16 +1,16 @@
 #include <systemc.h>
 
-#define MAX_VALUE 256
-#define ASSERT_TIME 10
+#define MAX_VALUE 		256
+#define ASSERT_TIME 		10
 #define TIMER_CNTRL 		0x0
-#define TIMER_VAL 			0x4
-#define TIMER_CMP 			0x8
+#define TIMER_VAL 		0x4
+#define TIMER_CMP 		0x8
 #define	TIMER_INTR_STATUS 	0xC
 
 // Timer control register bits
-#define TIMER_CNTRL_EN	0
-#define TIMER_CNTRL_CMP	1
-#define TIMER_CNTRL_OV	2
+#define TIMER_CNTRL_EN		0
+#define TIMER_CNTRL_CMP		1
+#define TIMER_CNTRL_OV		2
 
 #define TIMER_INTR_STATUS_CMP 	0
 #define TIMER_INTR_STATUS_OV	1
@@ -35,6 +35,9 @@ SC_MODULE(uptimer)
 
 		sc_uint<8> get_timer_val()
 		{
+			/**
+			 * Returns current timer value by computing
+			 */
 			unsigned int total_time;
 			if(timer_cntrl[TIMER_CNTRL_EN]){
 				total_time = sc_time_stamp().value() - total_stop_time;
@@ -63,12 +66,18 @@ SC_MODULE(uptimer)
 
 		void reset_overflow_clbk()
 		{
+			/**
+			 * Callback function to deassert overflow interrupt
+			 */
 			int0.write(0);
 			timer_intr_status[TIMER_INTR_STATUS_OV] = 0;
 		}
 	
 		void set_match_clbk()
 		{
+			/**
+			 * Callback function to assert comparator interrupt
+			 */
 			if(timer_cntrl[TIMER_CNTRL_CMP]){
 				int1.write(1);
 				timer_intr_status[TIMER_INTR_STATUS_CMP] = 1;
@@ -79,6 +88,9 @@ SC_MODULE(uptimer)
 
 		void reset_match_clbk()
 		{
+			/**
+			 * Callback function to deassert comparator interrupt
+			 */
 			int1.write(0);
 			timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
 		}
@@ -91,16 +103,16 @@ SC_MODULE(uptimer)
 			if(read_en.read()){
 				switch(addr.read()){
 					case TIMER_CNTRL:
-									data_out.write(timer_cntrl);
-									break;
+							data_out.write(timer_cntrl);
+							break;
 
 					case TIMER_VAL:
-									data_out.write(get_timer_val());
-									break;
+							data_out.write(get_timer_val());
+							break;
 
 					case TIMER_CMP:
-									data_out.write(timer_cmp);
-									break;
+							data_out.write(timer_cmp);
+							break;
 				}
 			}
 				
@@ -108,6 +120,9 @@ SC_MODULE(uptimer)
 
 		void write_timer_cntrl(sc_uint<8> data)
 		{
+			/**
+			 * Write data to timer_cntrl register and update events
+			 */
 			timer_cntrl = data;
 			sc_uint<8> timer_val;
 			if(!data[TIMER_CNTRL_EN]){
@@ -141,6 +156,9 @@ SC_MODULE(uptimer)
 
 		void write_timer_cmp(sc_uint<8> data)
 		{
+			/**
+			 * Write data to timer_cmp and update events
+			 */
 			timer_cmp = data;
 			set_match.cancel();
 			sc_uint<8> timer_val = get_timer_val();
@@ -162,23 +180,23 @@ SC_MODULE(uptimer)
 			if(write_en.read()){
 				switch(addr.read()){
 					case TIMER_CNTRL:
-									write_timer_cntrl(data_in.read());
-									break;
+							write_timer_cntrl(data_in.read());
+							break;
 
 					case TIMER_CMP:
-									write_timer_cmp(data_in.read());
-									break;
+							write_timer_cmp(data_in.read());
+							break;
 					
 					// Reset interrupts by write 1 clear register
 					case TIMER_INTR_STATUS:
-									if(CHECK_BIT(TIMER_INTR_STATUS_OV, data_in.read())){
-										timer_intr_status[TIMER_INTR_STATUS_OV] = 0;
-										int0.write(0);
-									}
-									if(CHECK_BIT(TIMER_INTR_STATUS_CMP, data_in.read())){
-										timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
-										int1.write(0);
-									}
+							if(CHECK_BIT(TIMER_INTR_STATUS_OV, data_in.read())){
+								timer_intr_status[TIMER_INTR_STATUS_OV] = 0;
+								int0.write(0);
+							}
+							if(CHECK_BIT(TIMER_INTR_STATUS_CMP, data_in.read())){
+								timer_intr_status[TIMER_INTR_STATUS_CMP] = 0;
+								int1.write(0);
+							}
 				}
 			}
 				
