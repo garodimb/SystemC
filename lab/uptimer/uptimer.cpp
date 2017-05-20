@@ -1,5 +1,5 @@
 #include <systemc.h>
-#define MAX_VALUE 255
+#define MAX_VALUE 		255
 
 #define TIMER_CNTRL 		0x0
 #define TIMER_VAL 		0x4
@@ -7,9 +7,9 @@
 #define	TIMER_INTR_STATUS 	0xC
 
 // Timer control register bits
-#define TIMER_CNTRL_EN	0
-#define TIMER_CNTRL_CMP	1
-#define TIMER_CNTRL_OV	2
+#define TIMER_CNTRL_EN		0
+#define TIMER_CNTRL_CMP		1
+#define TIMER_CNTRL_OV		2
 
 #define TIMER_INTR_STATUS_CMP 	0
 #define TIMER_INTR_STATUS_OV	1
@@ -408,5 +408,4 @@ Info: /OSCI/SystemC: Simulation stopped by user.
 real	0m2.875s
 user	0m2.864s
 sys	0m0.004s
-
 **/
