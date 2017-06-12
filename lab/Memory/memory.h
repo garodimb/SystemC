@@ -6,7 +6,7 @@ using namespace sc_dt;
 using namespace std;
 #define ADDR_WIDTH 32 // Address width in bits
 #define DATA_WIDTH 32 // Data bus width in bits
-#define SIZE 256 // Total memory size DATA_WIDTH * SIZE bytes
+#define SIZE 262144 // Total memory size DATA_WIDTH * SIZE bytes = 1MB
 
 //#define DEBUG_M 1
 

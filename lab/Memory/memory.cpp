@@ -27,7 +27,7 @@ Memory::~Memory()
 
 void Memory::read()
 {	
-	// Read to memory
+	// Read from memory
 	data_bus.write(mem[addr_bus.read()]);
 	
 	#ifdef DEBUG_M

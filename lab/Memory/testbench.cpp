@@ -11,9 +11,7 @@ Testbench::Testbench(sc_module_name _name) : sc_module(_name)
 	write_buff = new sc_uint<DATA_WIDTH>[BUFF_SIZE];
 	
 	// Read file to buffer
-	for(int i = 0; i < BUFF_SIZE; i++){
-		write_buff[i] = i;
-	}
+	read_file("1mb.bin",write_buff,BUFF_SIZE);
 
 	SC_THREAD(read_write);
 }
@@ -95,4 +93,16 @@ bool Testbench::compare(const sc_uint<32> *read_buff, const sc_uint<32> *write_b
 		}
 	}
 	return true;
+}
+
+size_t Testbench::read_file(char *fname, void *buf, size_t len)
+{
+	size_t r_len;
+	if (FILE *fp = fopen(fname, "r"))
+	{
+		r_len = fread(buf, 1, len , fp);
+		fclose(fp);
+	}
+
+	return r_len;
 }

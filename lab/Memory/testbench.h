@@ -2,7 +2,7 @@
 #define TESTBENCH_H
 #include <systemc>
 
-#define BUFF_SIZE 256 // Total Size = BUFF_SIZE * DATA_WIDTH
+#define BUFF_SIZE 262144 // Total Size = BUFF_SIZE * DATA_WIDTH = 1MB
 #define DATA_WIDTH 32 // Data width in bits
 #define ADDR_WIDTH 32 // In bits
 using namespace std;
@@ -20,6 +20,7 @@ struct Testbench : sc_module
 		void read(); // Read from memory
 		void write(); // Write to memory
 		void read_write(); // Do read and write operation
+		size_t read_file(char *fname, void *buf, size_t len);
 		bool compare(const sc_uint<32> *read_buff, const sc_uint<32> *write_buff, size_t len);
 
 	public:
