@@ -11,7 +11,7 @@ Testbench::Testbench(sc_module_name _name) : sc_module(_name), socket("tb_socket
 	write_buff = new unsigned char[BUFF_SIZE];
 
 	// Read file to buffer
-	read_file("1mb.bin",write_buff,BUFF_SIZE);
+	read_file((char *)"1mb.bin",write_buff,BUFF_SIZE);
 
 	SC_THREAD(read_write);
 }
@@ -34,7 +34,7 @@ void Testbench::write()
 	trans.set_byte_enable_ptr(0);
 	trans.set_dmi_allowed(false);
 	trans.set_response_status(TLM_INCOMPLETE_RESPONSE);
-	
+
 	for(int i = 0 ; i < BUFF_SIZE; i+=4){
 		#ifdef DEBUG_T
 		cout << "[WRITE_T][ " << sc_time_stamp() << " ] MEM[ " << i << " ] : " << (unsigned int)write_buff[i] << endl;
@@ -43,6 +43,12 @@ void Testbench::write()
 		trans.set_data_ptr(&write_buff[i]);
 		socket->b_transport(trans, w_dly);
 		
+		if(trans.is_response_error()){
+			char errtxt[100];
+			sprintf(errtxt,"%s", trans.get_response_string().c_str());
+			SC_REPORT_ERROR("[MEMORY]",errtxt);
+		}
+
 		wait(w_dly); // Realize wait delay
 	}
 
@@ -59,11 +65,18 @@ void Testbench::read()
 	trans.set_byte_enable_ptr(0);
 	trans.set_dmi_allowed(false);
 	trans.set_response_status(TLM_INCOMPLETE_RESPONSE);
-	
+
 	for(int i = 0 ; i < BUFF_SIZE; i+=4){
 		trans.set_address(uint64(i));
 		trans.set_data_ptr(&read_buff[i]);
 		socket->b_transport(trans, w_dly);
+
+		if(trans.is_response_error()){
+			char errtxt[100];
+			sprintf(errtxt,"[ERROR] %s", trans.get_response_string().c_str());
+			SC_REPORT_ERROR("[TLM-2]",errtxt);
+		}
+
 		wait(r_dly); // Realize read delay
 		
 		#ifdef DEBUG_T

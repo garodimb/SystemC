@@ -11,7 +11,7 @@ Testbench::Testbench(sc_module_name _name) : sc_module(_name)
 	write_buff = new sc_uint<DATA_WIDTH>[BUFF_SIZE];
 	
 	// Read file to buffer
-	read_file("1mb.bin",write_buff,BUFF_SIZE);
+	read_file((char *)"1mb.bin",write_buff,BUFF_SIZE);
 
 	SC_THREAD(read_write);
 }
