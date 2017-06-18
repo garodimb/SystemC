@@ -36,3 +36,4 @@ systemc-2.3.1a
 systemc
 sim
 *.vcd
+uvm
