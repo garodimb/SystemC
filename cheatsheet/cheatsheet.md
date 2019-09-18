@@ -54,3 +54,34 @@
     moduleName.dataIn_.bind(dataSig_);
     moduleName.dataOut_.bind(dataSig_);
     ```
+    
+## TLM-2.0
+* ### Simple Socket Declaration
+    ```cpp
+    tlm_utils::simple_initiator_socket<ModuleName, BUSWIDTH> initiatorSocket_{ "initiatorSocket_" };
+    tlm_utils::simple_initiator_socket<ModuleName, BUSWIDTH> targetSocket_{ "targetSocket_" };
+    ```
+* ### Forward Interface methods
+    > ***Implement in Target Module***
+    
+    ```cpp
+    void b_transport(tlm::tlm_generic_payload& trans, sc_time& delay);
+    unsigned int transport_dbg(tlm::tlm_generic_payload& r);
+    tlm::tlm_sync_enum nb_transport_fw(tlm::tlm_generic_payload& trans, tlm::tlm_phase& phase, sc_time& delay);
+    bool get_direct_mem_ptr(tlm::tlm_generic_payload& trans, tlm::tlm_dmi& dmi_data)
+    ```
+* ### Backward Interface methods
+    > ***Implement in Initiator Module***
+
+    ```cpp
+    tlm::tlm_sync_enum nb_transport_bw(tlm::tlm_generic_payload& trans, tlm::tlm_phase& phase, sc_time& delay);
+    void invalidate_direct_mem_ptr(sc_dt::uint64 start_range, sc_dt::uint64 end_range);
+    ```
+* ### Registering member function as callback to simple socket
+    ```cpp
+    targetSocket_.register_b_transport(this, &ModuleName::memberFunctionName);
+    ```
+* ### Binding Sockets
+    ```cpp
+    initiatorModule.initiatorSocket_.bind(targetModule.targetSocket_);
+    ```
